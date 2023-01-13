@@ -1,20 +1,29 @@
 package com.openclassrooms.entrevoisins.neighbour_list;
 
 import static android.support.test.espresso.Espresso.onView;
+import static android.support.test.espresso.action.ViewActions.click;
+import static android.support.test.espresso.action.ViewActions.scrollTo;
+import static android.support.test.espresso.action.ViewActions.swipeLeft;
 import static android.support.test.espresso.assertion.ViewAssertions.matches;
 import static android.support.test.espresso.matcher.ViewMatchers.assertThat;
 import static android.support.test.espresso.matcher.ViewMatchers.hasMinimumChildCount;
+import static android.support.test.espresso.matcher.ViewMatchers.withId;
+import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static com.openclassrooms.entrevoisins.utils.RecyclerViewItemCountAssertion.withItemCount;
 import static org.hamcrest.core.IsNull.notNullValue;
 
+import android.support.test.espresso.Espresso;
 import android.support.test.espresso.contrib.RecyclerViewActions;
 import android.support.test.espresso.matcher.ViewMatchers;
 import android.support.test.rule.ActivityTestRule;
 import android.support.test.runner.AndroidJUnit4;
 
 import com.openclassrooms.entrevoisins.R;
+import com.openclassrooms.entrevoisins.di.DI;
+import com.openclassrooms.entrevoisins.service.NeighbourApiService;
 import com.openclassrooms.entrevoisins.ui.neighbour_list.ListNeighbourActivity;
 import com.openclassrooms.entrevoisins.utils.DeleteViewAction;
+import com.openclassrooms.entrevoisins.utils.ListNeighbourHelper;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -30,15 +39,18 @@ public class NeighboursListTest {
 
     // This is fixed
     private static int ITEMS_COUNT = 12;
+    private ListNeighbourActivity mActivity;
+    private NeighbourApiService service;
+
     @Rule
     public ActivityTestRule<ListNeighbourActivity> mActivityRule =
             new ActivityTestRule(ListNeighbourActivity.class);
-    private ListNeighbourActivity mActivity;
 
     @Before
     public void setUp() {
         mActivity = mActivityRule.getActivity();
         assertThat(mActivity, notNullValue());
+        service = DI.getNewInstanceApiService();
     }
 
     /**
@@ -46,9 +58,16 @@ public class NeighboursListTest {
      */
     @Test
     public void myNeighboursList_shouldNotBeEmpty() {
-        // First scroll to the position that needs to be matched and click on it.
-        onView(ViewMatchers.withId(R.id.list_neighbours))
+        // all neighbour list
+        ListNeighbourHelper.getAllNeighbour()
                 .check(matches(hasMinimumChildCount(1)));
+    }
+
+    @Test
+    public void myFavoriteNeighboursList_shouldBeEmpty() {
+        // favorite list is empty
+        ListNeighbourHelper.getFavoriteNeighbour()
+                .check(withItemCount(0));
     }
 
     /**
@@ -57,33 +76,42 @@ public class NeighboursListTest {
     @Test
     public void myNeighboursList_deleteAction_shouldRemoveItem() {
         // Given : We remove the element at position 2
-        onView(ViewMatchers.withId(R.id.list_neighbours)).check(withItemCount(ITEMS_COUNT));
+        ListNeighbourHelper.getAllNeighbour().check(withItemCount(ITEMS_COUNT));
         // When perform a click on a delete icon
-        onView(ViewMatchers.withId(R.id.list_neighbours))
+        ListNeighbourHelper.getAllNeighbour()
                 .perform(RecyclerViewActions.actionOnItemAtPosition(1, new DeleteViewAction()));
         // Then : the number of element is 11
-        onView(ViewMatchers.withId(R.id.list_neighbours)).check(withItemCount(ITEMS_COUNT - 1));
+        ListNeighbourHelper.getAllNeighbour().check(withItemCount(ITEMS_COUNT-1));
     }
 
-    @Test//cliquer sur le fab rajoute bien un élément
-    public void myNeighbourList_fabAddNeighbour_shouldAddItem() {
-        onView(ViewMatchers.withId(R.id.list_neighbours)).check(withItemCount(ITEMS_COUNT));
-        //onView(withId(R.id.add_neighbour)).perform(click());
-
-        onView(ViewMatchers.withId(R.id.list_neighbours)).check(withItemCount(ITEMS_COUNT + 1));
+    @Test
+    public void myNeighboursList_clickOnItem_shouldOpenDetail() {
+        // When perform a click on a item
+        ListNeighbourHelper.getAllNeighbour()
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, click()));
+        onView(ViewMatchers.withId(R.id.detail_name)).check(matches(ViewMatchers.isDisplayed()));
     }
 
-    @Test//Favoris = 1
-    public void myFavoriteList_addAction_shoulAddFavorite() {
+    @Test
+    public void myNeighboursList_clickOnFirstItem_shouldShowFirstName() {
+        // When perform a click on a item
+        ListNeighbourHelper.getAllNeighbour()
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, click()));
 
+        String neighbourName = service.getNeighbours(false).get(0).getName();
+        onView(ViewMatchers.withId(R.id.detail_name)).check(matches(withText(neighbourName)));
+    }
+
+    @Test
+    public void myNeighboursList_CountFavorites() {
+        ListNeighbourHelper.getAllNeighbour()
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, click()));
+        onView(withId(R.id.favorite_button)).perform(scrollTo(), click());
+        Espresso.pressBack();
+        ListNeighbourHelper.getAllNeighbour().perform(swipeLeft());
+        ListNeighbourHelper.getFavoriteNeighbour()
+                .check(withItemCount(1));
     }
 
 }
-
-
-//verifier que l'activité add a new neighbour s'affiche bien
-
-//les détails s'affichent bien en cliquant un Neighbour donné
-
-//verifier le bon fonctionnementd e l'étoile du bouton retour et de la persistance du statut favoris (=1)
 
